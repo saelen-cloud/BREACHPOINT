@@ -31,7 +31,7 @@ using UnityEngine.XR.OpenXR.Features.MetaQuestSupport;
 public static class VRSetup
 {
     const string XRSettingsAssetPath = "Assets/XR/XRGeneralSettingsPerBuildTarget.asset";
-    const string ScenePath = "Assets/Scenes/SampleScene.unity";
+    const string ScenePath = "Assets/Scenes/Main.unity";
     const string RigPrefabPath = "Assets/Samples/XR Interaction Toolkit/3.0.1/Starter Assets/Prefabs/XR Origin (XR Rig).prefab";
     const string MaterialFolder = "Assets/Materials";
     const string OpenXRLoaderType = "UnityEngine.XR.OpenXR.OpenXRLoader";

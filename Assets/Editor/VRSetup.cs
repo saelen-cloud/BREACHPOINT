@@ -12,6 +12,7 @@ using UnityEditor.XR.OpenXR.Features;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.Rendering;
+using UnityEngine.Rendering.Universal;
 using UnityEngine.SceneManagement;
 using UnityEngine.XR.Interaction.Toolkit;
 using UnityEngine.XR.Interaction.Toolkit.Interactables;
@@ -112,6 +113,8 @@ public static class VRSetup
     {
         PlayerSettings.colorSpace = ColorSpace.Linear;
 
+        PlayerSettings.productName = "BREACHPOINT";
+        PlayerSettings.applicationIdentifier = "com.breachpoint.breachpoint";
         PlayerSettings.SetUseDefaultGraphicsAPIs(BuildTarget.Android, false);
         PlayerSettings.SetGraphicsAPIs(
             BuildTarget.Android,
@@ -130,7 +133,7 @@ public static class VRSetup
             new EditorBuildSettingsScene(ScenePath, true),
         };
 
-        Debug.Log("Configured Linear color space, Vulkan/GLES3, IL2CPP, ARM64, and Android API 29+.");
+        Debug.Log("Configured Linear color space, Vulkan/GLES3, IL2CPP, ARM64, API 29+, package=com.breachpoint.breachpoint, name=BREACHPOINT.");
     }
 
     static void ConfigureXrManagement()
@@ -200,6 +203,10 @@ public static class VRSetup
             if (group == BuildTargetGroup.Android)
             {
                 EnableFeature<MetaQuestTouchProControllerProfile>(settings, group);
+                
+                // Note: Meta XR Core feature is in a different namespace/assembly
+                // It's typically auto-enabled when Meta Quest Support is enabled
+                
                 var metaQuest = EnableFeature<MetaQuestFeature>(settings, group);
                 metaQuest.AddTargetDevice("quest3", "Quest 3", true);
                 metaQuest.AddTargetDevice("quest3s", "Quest 3S", true);
@@ -235,8 +242,6 @@ public static class VRSetup
         var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
         var floorMaterial = GetOrCreateMaterial("Floor", new Color(0.16f, 0.18f, 0.22f), 0.15f);
-        var tableMaterial = GetOrCreateMaterial("Table", new Color(0.32f, 0.22f, 0.15f), 0.25f);
-        var cubeMaterial = GetOrCreateMaterial("Interactable", new Color(0.08f, 0.55f, 0.95f), 0.45f);
 
         var environment = new GameObject("Environment").transform;
 
@@ -244,47 +249,13 @@ public static class VRSetup
             "Floor",
             PrimitiveType.Cube,
             new Vector3(0f, -0.05f, 0f),
-            new Vector3(10f, 0.1f, 10f),
+            new Vector3(50f, 0.1f, 50f),
             floorMaterial,
             environment);
 
         var teleportArea = floor.AddComponent<TeleportationArea>();
         teleportArea.colliders.Clear();
         teleportArea.colliders.Add(floor.GetComponent<Collider>());
-
-        CreatePrimitive(
-            "Table",
-            PrimitiveType.Cube,
-            new Vector3(0f, 0.4f, 1.6f),
-            new Vector3(1.4f, 0.8f, 0.9f),
-            tableMaterial,
-            environment);
-
-        CreatePrimitive(
-            "Table Top",
-            PrimitiveType.Cube,
-            new Vector3(0f, 0.82f, 1.6f),
-            new Vector3(1.55f, 0.04f, 1.05f),
-            tableMaterial,
-            environment);
-
-        for (var i = -1; i <= 1; i++)
-        {
-            var cube = CreatePrimitive(
-                $"Grabbable Cube {i + 2}",
-                PrimitiveType.Cube,
-                new Vector3(i * 0.34f, 0.95f, 1.6f),
-                Vector3.one * 0.22f,
-                cubeMaterial,
-                environment);
-
-            var rigidbody = cube.AddComponent<Rigidbody>();
-            rigidbody.mass = 0.5f;
-            rigidbody.interpolation = RigidbodyInterpolation.Interpolate;
-            rigidbody.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-
-            cube.AddComponent<XRGrabInteractable>();
-        }
 
         var lightObject = new GameObject("Directional Light");
         lightObject.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
@@ -303,6 +274,24 @@ public static class VRSetup
         rig.name = "XR Origin (XR Rig)";
         rig.transform.SetPositionAndRotation(Vector3.zero, Quaternion.identity);
 
+        // Fix camera for URP XR rendering on Quest
+        var camera = rig.GetComponentInChildren<Camera>();
+        if (camera != null)
+        {
+            // Set clear flags to Solid Color with alpha 0 for passthrough
+            camera.clearFlags = CameraClearFlags.SolidColor;
+            camera.backgroundColor = new Color(0, 0, 0, 0);
+            
+            // Add UniversalAdditionalCameraData for URP XR rendering
+            var urpCameraData = camera.GetComponent<UniversalAdditionalCameraData>();
+            if (urpCameraData == null)
+                urpCameraData = camera.gameObject.AddComponent<UniversalAdditionalCameraData>();
+            
+            urpCameraData.renderType = CameraRenderType.Base;
+            urpCameraData.requiresDepthTexture = false;
+            urpCameraData.requiresColorTexture = false;
+        }
+
         var interactionManager = new GameObject("XR Interaction Manager");
         interactionManager.AddComponent<XRInteractionManager>();
 
@@ -315,7 +304,7 @@ public static class VRSetup
         EditorSceneManager.MarkSceneDirty(scene);
         EditorSceneManager.SaveScene(scene, ScenePath);
 
-        Debug.Log($"Rebuilt {ScenePath} with XR Origin, interaction manager, teleport floor, and grabbable cubes.");
+        Debug.Log($"Rebuilt {ScenePath} with XR Origin, interaction manager, and teleport floor.");
     }
 
     static GameObject CreatePrimitive(
